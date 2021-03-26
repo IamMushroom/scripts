@@ -29,13 +29,15 @@ ForEach ($i in $BASES)
     New-Item -ItemType "directory" -Path "$LOGDIR\$i"
   }
   $TIME=Get-Date -Format "dd-MM-yy_HH:mm"
+  if ( -not (Test-Path -PathType Leaf -Path "$LOGDIR\$i\$DATE.log")) {
   New-Item -Name "$DATE.log" -Path "$LOGDIR\$i"
+  }
   Write-Output "$TIME : Start backup of database" >> $LOGDIR/$i/$DATE.log
   if ( -not (Test-Path "$BACKUPDIR\$i")) {
     New-Item -ItemType "directory" -Path "$BACKUPDIR\$i"
   }
 
-  .\pg_dump -U postgres -F custom -f "$BACKUPDIR/$i/$DATE.backup" -v 2 >> $LOGDIR/$i/$DATE.log
+  .\pg_dump -U postgres -F custom -f "$BACKUPDIR/$i/$DATE.backup" -v $i
   
   $TIME=Get-Date -Format "dd-MM-yy_HH:mm"
   Write-Output "$TIME : Finish backup of database" >> $LOGDIR/$i/$DATE.log
