@@ -1,0 +1,67 @@
+# Add DHCP leases from csv file
+
+:local FileName "FileTemplate.csv";
+:local Separator ",";
+
+:log warning "Script CreateDHCPLeases: running. Import from file: $FileName";
+
+:if ([/file get $FileName size]  > 4096) do={
+    :log error "Error run script CreateDHCPLeases: file size exceeded 4 KB (size constraint of a variable in Router OS 6). Split the file $FileName into several parts.";
+    :error "File size exceeded 4 KB. Stop script."
+};
+
+:local Content [/file get $FileName contents];
+:local ContentLen [:len $Content];
+:set Content [:pick $Content 13 $ContentLen];
+
+:local StartCursor 0;
+:local EndCursor;
+:local LineEndCursor;
+
+:while ($StartCursor < [:len $Content]) do={
+
+    :set LineEndCursor [:find $Content "\r" $StartCursor];
+
+    :local  Cont;
+
+    :local ColumnsArray { "01MAC"="" ; "02Address"=""};
+
+    # START PARSING STRING
+    :foreach Key,Value in=$ColumnsArray do={
+
+        :local Symbol [:pick $Content $StartCursor];
+
+        :if ($Symbol =",") do={:set StartCursor ($StartCursor - 1)};
+
+        :set EndCursor [:find $Content "," $StartCursor];
+
+        :if (($EndCursor > $LineEndCursor) or ([:typeof $EndCursor]="nil")) do={:set EndCursor [:find $Content "\r" ($StartCursor-1)];};
+
+        :set Cont [:pick $Content $StartCursor $EndCursor];
+
+        :set ($ColumnsArray -> $Key ) $Cont;
+
+        :set StartCursor ($EndCursor+1);
+    };
+    # END PARSING STRING
+
+    # START CREATE COMMAND
+    :local MAC ($ColumnsArray -> "01MAC");
+
+    :if ([/ppp secret find name=$MAC ]) do={
+        :log info "Add DHCP lease: $MAC - already exist! Skipped.";
+    } else={
+        :local Command "/ip dhcp-server lease add mac-address=$MAC";
+
+        :local Address ($ColumnsArray -> "02Address");
+        :if ($Address != ",") do= {:set Command ("$Command" . " address=$Address")};
+
+        [:parse $Command];
+
+    };
+    # END CREATE COMMAND
+
+    :set StartCursor ($EndCursor+2);
+};
+:delay 2;
+:log warning "Script CreateDHCPLeases: completed.";
